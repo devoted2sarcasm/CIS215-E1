@@ -1,0 +1,81 @@
+1. Describe in detail everything that's happening in and between the 7 tables
+
+-Ferry table maintains a list of Ferries to be used during cruises, assigning each a unique id, used as the primary key for the table
+	-this is used on two other tables as foreign keys
+
+-cabin table keeps a full list of cabins on the boats, each cabin with a unique id, used as the primary key for that table
+	-foreign key ferry id helps track which boat the cabin belongs to
+	-cabin_type_id is a foreign key for the table cabin_type
+	-tracks which deck each cabin is on, how much it costs, which ferry it's on, what type of cabin (presumably queen, king, quite, etc.), number of guests allowed
+
+-port table maintains a unique id for each port, used as the primary key
+	-holds a name and address for each port
+
+-cruise table maintains a list of all possible cruises, assigned unique ids, used as primary key
+	-the ferry id (foreign key from ferry table) used to identify which boat is sailing
+	-port arrival and departure are ids (foreign keys to port table) to identify origin and destination of each cruise
+	-departure and arrival datetimes used to denote expected ETD, ETA
+
+-ticket table tracks individual cabin purchases, each assigned a unique id (primary key) by cabin id (foreign key), cruise id (foreign key), and provides a qr code for scanning (presumably to track check-in before departure time, so the company can make sure all sold tickets are accounted for before departure)
+
+-services table maintains a list of what services are available to guests based on the cabin_type they booked/paid for
+
+
+2.
+
+SELECT Cruise.id, Port.name as "Departs from: ", Port.address as "Address: ", Port.name as "Arrives to: ", Port.address as "Address: "
+FROM Cruise
+INNER JOIN Ferry ON Ferry.id=Cruise.ferry_id
+INNER JOIN Cabin ON Cabin.ferry_id=Ferry.id
+INNER JOIN Cabin_type ON Cabin_type.id=Cabin.cabin_type_id
+INNER JOIN Services ON Services.cabin_type_id=Cabin_type.id
+INNER JOIN Port ON Port.id=Cruise.port_departure
+INNER JOIN Port ON Port.id=Cruise.port_arrival
+	WHERE Cruise.port_departure=(SELECT Port.id
+		FROM Port
+		INNER JOIN Cruise ON Port.id=Cruise.port_departure
+		WHERE Port.name="Charlevoix";)
+	AND Cruise.port_arrival=(SELECT Port.id
+		FROM Port
+		INNER JOIN Cruise ON Port.id=Cruise.port_arrival
+		WHERE Port.name="South Haven";)
+	HAVING (SELECT Ferry.id
+		FROM Ferry
+		INNER JOIN Cabin ON Ferry.id=Cabin.ferry_id
+		HAVING (SELECT DISTINCT Cabin.cabin_type_id
+			FROM Cabin
+			INNER JOIN Cabin_type ON Cabin.cabin_type_id=Cabin_type.id
+			INNER JOIN Services ON Cabin_type.id=Services.cabin_type_id
+			WHERE Services.name="Cocktail"
+			;)
+		;)
+;
+
+I cannot accomplish separating the departure port from the arrival port in the SELECT statement without more study. 
+Which leads me to answering part 3.
+
+3.
+
+I feel that each port should have a unique id, but the name of the port may not be the location of the port. The address should be separated into street#, street name, city and state as four separate values. What if two ports have the same street address but are in different cities? What if one city has multiple ports? Rules of normalization should break this down into different bits of information.
+
+
+Data used and stuff:
+
+SELECT Port.id
+FROM Port
+INNER JOIN Cruise ON Port.id=Cruise.port_departure
+WHERE Port.name="Charlevoix";
+
+SELECT Port.id
+FROM Port
+INNER JOIN Cruise ON Port.id=Cruise.port_arrival
+WHERE Port.name="South Haven";
+
+SELECT Ferry.id
+FROM Ferry
+INNER JOIN Cabin ON Ferry.id=Cabin.ferry_id
+HAVING (SELECT DISTINCT Cabin.cabin_type_id
+	FROM Cabin
+	INNER JOIN Cabin_type ON Cabin.cabin_type_id=Cabin_type.id
+	INNER JOIN Services ON Cabin_type.id=Services.cabin_type_id
+	WHERE Services.name="Cocktail";)
